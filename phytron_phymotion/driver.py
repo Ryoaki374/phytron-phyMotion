@@ -13,20 +13,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
-import threading
+from slave.driver import Driver
 
-from slave.driver import Driver, Command
-from slave.types import String, BitSequence
-from protocol import PhytronProtocol
+from .protocol import PhytronProtocol
 
-from message import AxisMessage
+from .message import AxisMessage
 
-from messages.clear import ClearMessage
-from messages.parameter import ParameterMessage
-from messages.isholding import IsHoldingMessage
-from messages.endphase import EndPhaseMessage
-from messages.arbitrary import ArbitraryMessage
+from .messages.clear import ClearMessage
+from .messages.parameter import ParameterMessage
+from .messages.isholding import IsHoldingMessage
+from .messages.endphase import EndPhaseMessage
+from .messages.arbitrary import ArbitraryMessage
 
 class PhytronDriver(Driver):
     def __init__(self, transport, protocol=None):
@@ -71,7 +68,7 @@ class PhytronDriver(Driver):
         self.send_message(AxisMessage(self._signum(rel)+str(abs(rel))))
 
     def move_absolute(self, position):
-        self.send_message(AxisMessage('A' + self._signum(rel) + str(position)))
+        self.send_message(AxisMessage('A' + self._signum(position) + str(abs(position))))
 
     def get_absolute_counter(self):
         msg = ParameterMessage()

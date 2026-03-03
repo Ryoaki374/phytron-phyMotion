@@ -16,8 +16,8 @@
 from e21_util.transport import Serial
 from e21_util.log import get_sputter_logger
 from e21_util.ports import Ports
-from protocol import PhytronProtocol
-from driver import PhytronDriver
+from .protocol import PhytronProtocol
+from .driver import PhytronDriver
 
 class PhytronFactory:
     
