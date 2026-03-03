@@ -15,9 +15,8 @@
 
 import slave
 import logging
-from slave.transport import Timeout
 from slave.protocol import Protocol
-from message import AbstractMessage, Message, Response
+from .message import AbstractMessage, Message
 
 import e21_util
 from e21_util.lock import InterProcessTransportLock
