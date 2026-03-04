@@ -14,10 +14,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-import threading
-
-import slave
 from slave.protocol import Protocol
+from .message import AbstractMessage, Message
 
 from .errors import CommunicationError
 from .message import AbstractMessage, Message

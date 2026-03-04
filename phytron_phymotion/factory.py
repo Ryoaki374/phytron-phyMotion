@@ -13,13 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import logging
-import os
-
+from e21_util.transport import Serial
+from e21_util.log import get_sputter_logger
+from e21_util.ports import Ports
 from .protocol import PhytronProtocol
 from .driver import PhytronDriver
-from .transport import SerialTransport
-
 
 class PhytronFactory:
 
