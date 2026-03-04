@@ -37,7 +37,7 @@ class ParameterMessage(AxisMessage):
         self._axis_cmd = 'P' + str(id).zfill(2) + 'R'
 
     def _is_valid_id(self, id):
-        if not isinstance(id, (int, long)):
+        if not isinstance(id, int):
             raise TypeError("number must be of instance integer")
 
         if id < 0 or id > 100:
