@@ -2,9 +2,10 @@
 """Minimal single-file control script (no classes).
 
 実施内容:
-1) シリアル接続確立
-2) P41 (current) を設定
-3) 相対 +200 パルス移動
+1) シリアル接続確立(open)
+2) P17/P40/P42/P41 を設定
+3) 相対パルス移動（カウンターと上限下限チェック付き）
+4) 最後にclose
 
 必要ライブラリ:
     pip install pyserial
@@ -16,15 +17,21 @@ import serial
 DEVICE = '/dev/ttyUSB0'
 BAUDRATE = 115200
 TIMEOUT = 0.5
-ADDRESS = '0'   # 0..9,A..F,@
+ADDRESS = '0'   # 0..9,A..F,@  (後で切り替える前提)
 MODULE = 0
 AXIS = 0
 CURRENT = 50
+
+PULSE_MAX = 10000
+PULSE_MIN = -10000
 # ====================================
 
 STX = '\x02'
 ETX = '\x03'
 SEP = ':'
+
+# 符号付きで積算されるパルスカウンター
+pulse_counter = 0
 
 
 def checksum(payload: str) -> str:
@@ -53,17 +60,46 @@ def send_cmd(port: serial.Serial, cmd: str) -> str:
     return read_response(port)
 
 
+def set_drive_parameters(port: serial.Serial):
+    # 要望: P17=0, P40=0, P42=0, P41=CURRENT
+    print('P17 response:', send_cmd(port, f"M{MODULE}.{AXIS}P17=0"))
+    print('P40 response:', send_cmd(port, f"M{MODULE}.{AXIS}P40=0"))
+    print('P42 response:', send_cmd(port, f"M{MODULE}.{AXIS}P42=0"))
+    print('P41 response:', send_cmd(port, f"M{MODULE}.{AXIS}P41={CURRENT}"))
+
+
+def move_relative_with_limit(port: serial.Serial, pulse: int):
+    global pulse_counter
+
+    next_counter = pulse_counter + pulse
+    if next_counter > PULSE_MAX or next_counter < PULSE_MIN:
+        print(
+            f'ABORT: pulse_counter={pulse_counter}, request={pulse}, '
+            f'next={next_counter} is out of range [{PULSE_MIN}, {PULSE_MAX}]'
+        )
+        return False
+
+    sign = '+' if pulse >= 0 else '-'
+    cmd = f"M{MODULE}.{AXIS}{sign}{abs(pulse)}"
+    resp = send_cmd(port, cmd)
+    pulse_counter = next_counter
+
+    print('Move response:', resp)
+    print('pulse_counter:', pulse_counter)
+    return True
+
+
 def main():
-    # 1) 通信確立
-    with serial.Serial(DEVICE, BAUDRATE, timeout=TIMEOUT) as ser:
-        # 2) 電流設定 P41=<CURRENT>  (軸コマンド: M<module>.<axis>P41=<val>)
-        resp1 = send_cmd(ser, f"M{MODULE}.{AXIS}P41={CURRENT}")
+    port = serial.Serial(DEVICE, BAUDRATE, timeout=TIMEOUT)
+    try:
+        # 1) 必要パラメータ設定
+        set_drive_parameters(port)
 
-        # 3) +200 パルス相対移動 (軸コマンド: M<module>.<axis>+200)
-        resp2 = send_cmd(ser, f"M{MODULE}.{AXIS}+200")
-
-        print('P41 response:', resp1)
-        print('+200 response:', resp2)
+        # 2) +200 パルス移動（上限下限チェック付き）
+        move_relative_with_limit(port, 200)
+    finally:
+        # 3) 最後にclose
+        port.close()
 
 
 if __name__ == '__main__':
