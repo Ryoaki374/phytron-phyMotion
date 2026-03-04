@@ -17,7 +17,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-requires = ['slave', 'pyserial']
+requires = ['pyserial']
 
 desc = ('An implementation of the Phytron phyMotion serial interface')
 
