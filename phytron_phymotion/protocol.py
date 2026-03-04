@@ -13,61 +13,53 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import slave
 import logging
-from slave.transport import Timeout
-from slave.protocol import Protocol
-from message import AbstractMessage, Message, Response
+import threading
 
-import e21_util
-from e21_util.lock import InterProcessTransportLock
-from e21_util.error import CommunicationError
+from .message import AbstractMessage, Message
 
 
-class PhytronProtocol(Protocol):
+class PhytronProtocol(object):
+    """Minimal protocol implementation for serial query/response."""
+
     def __init__(self, slave_addr=0, logger=None):
-
         if logger is None:
             logger = logging.getLogger(__name__)
             logger.addHandler(logging.NullHandler())
 
         self.logger = logger
         self.receiver = slave_addr
+        self._lock = threading.RLock()
 
     def set_logger(self, logger):
         self.logger = logger
 
     def clear(self, transport):
-        with InterProcessTransportLock(transport):
+        with self._lock:
             self.logger.debug("Clearing message queue")
             while True:
                 try:
                     transport.read_bytes(32)
-                except slave.transport.Timeout:
+                except Exception:
                     return
-        
+
     def send_message(self, transport, message):
-        
         data = message.get_raw()
         self.logger.debug('Send: "%s"', message)
-
         transport.write(data)
-    
+
     def read_response(self, transport):
-        try:
-            response = transport.read_until(Message.ETX)
-            ret = []
-            for chunk in response:
-                ret.append(chr(chunk))
-            ret.append(Message.ETX)
-            return ret
-        except:
-            raise CommunicationError("Could not read response")
-    
+        response = transport.read_until(Message.ETX)
+        ret = []
+        for chunk in response:
+            ret.append(chr(chunk))
+        ret.append(Message.ETX)
+        return ret
+
     def query(self, transport, message):
-        with InterProcessTransportLock(transport):
+        with self._lock:
             if not isinstance(message, AbstractMessage):
-                raise TypeError("message must be an instance of AbstractMessage")
+                return None
 
             msg = message.get_message()
             msg.set_address(self.receiver)
@@ -75,17 +67,7 @@ class PhytronProtocol(Protocol):
 
             self.send_message(transport, msg)
             response = self.read_response(transport)
-
-            resp = message.create_response(response)
-
-            if not resp.is_valid():
-                self.logger.error("Received invalid response: %s", resp)
-                raise CommunicationError("Invalid response")
-
-            if not resp.is_successful():
-                self.logger.warning("Action (%s) was not successful: %s", message, resp)
-
-            return resp
+            return message.create_response(response)
 
     def write(self, transport, message):
         return self.query(transport, message)
