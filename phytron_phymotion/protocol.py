@@ -13,14 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import slave
 import logging
 from slave.protocol import Protocol
 from .message import AbstractMessage, Message
 
-import e21_util
-from e21_util.lock import InterProcessTransportLock
-from e21_util.error import CommunicationError
+from .errors import CommunicationError
+from .message import AbstractMessage, Message
 
 
 class PhytronProtocol(Protocol):
@@ -32,26 +30,27 @@ class PhytronProtocol(Protocol):
 
         self.logger = logger
         self.receiver = slave_addr
+        self._lock = threading.RLock()
 
     def set_logger(self, logger):
         self.logger = logger
 
     def clear(self, transport):
-        with InterProcessTransportLock(transport):
+        with self._lock:
             self.logger.debug("Clearing message queue")
             while True:
                 try:
                     transport.read_bytes(32)
-                except slave.transport.Timeout:
+                except (slave.transport.Timeout, TimeoutError):
                     return
-        
+
     def send_message(self, transport, message):
-        
+
         data = message.get_raw()
         self.logger.debug('Send: "%s"', message)
 
         transport.write(data)
-    
+
     def read_response(self, transport):
         try:
             response = transport.read_until(Message.ETX)
@@ -60,11 +59,11 @@ class PhytronProtocol(Protocol):
                 ret.append(chr(chunk))
             ret.append(Message.ETX)
             return ret
-        except:
-            raise CommunicationError("Could not read response")
-    
+        except Exception as exc:
+            raise CommunicationError("Could not read response") from exc
+
     def query(self, transport, message):
-        with InterProcessTransportLock(transport):
+        with self._lock:
             if not isinstance(message, AbstractMessage):
                 raise TypeError("message must be an instance of AbstractMessage")
 

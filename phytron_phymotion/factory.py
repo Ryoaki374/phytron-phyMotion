@@ -20,17 +20,19 @@ from .protocol import PhytronProtocol
 from .driver import PhytronDriver
 
 class PhytronFactory:
-    
+
     def get_logger(self):
-        return get_sputter_logger('Phytron phyMotion', 'phytron.log')
-    
+        logger = logging.getLogger('phytron_phymotion')
+        logger.addHandler(logging.NullHandler())
+        return logger
+
     def create_driver(self, device=None, logger=None):
         if logger is None:
             logger = self.get_logger()
 
         if device is None:
-            device = Ports().get_port(Ports.DEVICE_PHYTRON)
+            device = os.environ.get('PHYTRON_DEVICE', '/dev/ttyUSB0')
 
         protocol = PhytronProtocol(logger=logger)
-        return PhytronDriver(Serial(device, 115200, 8, 'N', 1, 0.5), protocol)
-
+        transport = SerialTransport(device, 115200, 8, 'N', 1, 0.5)
+        return PhytronDriver(transport, protocol)
