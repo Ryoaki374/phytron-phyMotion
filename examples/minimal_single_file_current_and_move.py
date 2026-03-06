@@ -48,10 +48,45 @@ def build_command(address: str, cmd: str) -> bytes:
 
 
 def read_response(port: serial.Serial) -> str:
+    """Read and normalize response as:
+    <STX>|ACK|:|CHK|<ETX> or <STX>|NAK|:|CHK|<ETX>
+    """
     raw = port.read_until(ETX.encode('latin1'))
     if not raw:
         return ''
-    return raw.decode('latin1', errors='ignore')
+
+    text = raw.decode('latin1', errors='ignore')
+
+    # 最低限、先頭STXと末尾ETXを揃える
+    if not text.startswith(STX):
+        text = STX + text
+    if not text.endswith(ETX):
+        text = text + ETX
+
+    # ACK(0x06) / NAK(0x15) のみ整形対象にする
+    if len(text) >= 5 and text[1] in ('\x06', '\x15'):
+        status = text[1]
+        payload = text[2:-3]  # ':' の前まで
+
+        # 指定フォーマットへ寄せる（payloadなしのACK/NAK応答を想定）
+        if payload != SEP:
+            payload = SEP
+
+        chksum = text[-3:-1]
+        return STX + status + payload + chksum + ETX
+
+    return text
+
+
+def response_to_pipe_view(resp: str) -> str:
+    """Convert raw response to: <STX> | ACK/NAK | Separator | Checksum | <ETX>."""
+    if not resp or len(resp) < 6:
+        return resp
+
+    status = 'ACK' if resp[1] == '\x06' else 'NAK' if resp[1] == '\x15' else f'0x{ord(resp[1]):02X}'
+    sep = 'Separator' if resp[2] == SEP else repr(resp[2])
+    chksum = resp[-3:-1]
+    return f'<STX> | {status} | {sep} | {chksum} | <ETX>'
 
 
 def send_cmd(port: serial.Serial, cmd: str) -> str:
@@ -62,10 +97,10 @@ def send_cmd(port: serial.Serial, cmd: str) -> str:
 
 def set_drive_parameters(port: serial.Serial):
     # 要望: P17=0, P40=0, P42=0, P41=CURRENT
-    print('P17 response:', send_cmd(port, f"M{MODULE}.{AXIS}P17=0"))
-    print('P40 response:', send_cmd(port, f"M{MODULE}.{AXIS}P40=0"))
-    print('P42 response:', send_cmd(port, f"M{MODULE}.{AXIS}P42=0"))
-    print('P41 response:', send_cmd(port, f"M{MODULE}.{AXIS}P41={CURRENT}"))
+    print('P17 response:', response_to_pipe_view(send_cmd(port, f"M{MODULE}.{AXIS}P17=0")))
+    print('P40 response:', response_to_pipe_view(send_cmd(port, f"M{MODULE}.{AXIS}P40=0")))
+    print('P42 response:', response_to_pipe_view(send_cmd(port, f"M{MODULE}.{AXIS}P42=0")))
+    print('P41 response:', response_to_pipe_view(send_cmd(port, f"M{MODULE}.{AXIS}P41={CURRENT}")))
 
 
 def move_relative_with_limit(port: serial.Serial, pulse: int):
@@ -84,7 +119,7 @@ def move_relative_with_limit(port: serial.Serial, pulse: int):
     resp = send_cmd(port, cmd)
     pulse_counter = next_counter
 
-    print('Move response:', resp)
+    print('Move response:', response_to_pipe_view(resp))
     print('pulse_counter:', pulse_counter)
     return True
 
