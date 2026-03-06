@@ -46,13 +46,13 @@ class Message(object):
         return compute_chksum(list("".join([self.addr, self.cmd, self.SEPARATOR])))
         
     def set_address(self, addr):
-        if isinstance(addr, (int, long)):
+        if isinstance(addr, int):
             if addr in range(0, 16):
                 addr = hex(addr)[2:]
             else:
                 raise ValueError("address must be either 0...15 or '@'")
 
-        if not isinstance(addr, basestring):
+        if not isinstance(addr, str):
             raise ValueError("address must either be an integer or a string")
                 
         if addr.upper() in "1234567890ABCEDF@" and len(addr) == 1:
@@ -148,7 +148,7 @@ class AxisMessage(AbstractMessage):
         super(AxisMessage, self).__init__()
 
     def set_module(self, module):
-        if not isinstance(module, (int,long)):
+        if not isinstance(module, int):
             raise TypeError("module must be of instance integer")
 
         if not module >= 0:
@@ -157,7 +157,7 @@ class AxisMessage(AbstractMessage):
         self._module = module
 
     def set_axis(self, axis):
-        if not isinstance(axis, (int, long)):
+        if not isinstance(axis, int):
             raise TypeError("axis must be of instance integer")
 
         if not axis >= 0:
@@ -179,7 +179,7 @@ class AxisMessage(AbstractMessage):
     
 class AbstractResponse(object):
     def __init__(self, response):
-        if isinstance(response, basestring) or isinstance(response, list):
+        if isinstance(response, (str, list)):
             response = Response(response)
         
         if not isinstance(response, Response):
@@ -203,8 +203,10 @@ class AbstractResponse(object):
     def get_bool(self):
         return self.get() == 'E'
 
-    def __nonzero__(self):
+    def __bool__(self):
         return self.get_bool()
+
+    __nonzero__ = __bool__
 
     def __str__(self):
         return "".join([self.__class__.__name__, ':', str(self.resp)])
